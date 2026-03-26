@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAJ MODS AI - Stable Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: sans-serif; background-color: #0b0b0c; color: #e3e3e3; overflow: hidden; }
+        .gemini-logo {
+            width: 24px; height: 24px;
+            background: linear-gradient(45deg, #4285f4, #9b72cb, #d96570);
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z'/%3E%3C/svg%3E") no-repeat center;
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z'/%3E%3C/svg%3E") no-repeat center;
+        }
+        .code-block { background: #000; border: 1px solid #333; border-radius: 12px; margin: 15px 0; overflow: hidden; }
+        .code-header { background: #1a1a1b; padding: 10px 16px; font-size: 11px; display: flex; justify-content: space-between; border-bottom: 1px solid #333; color: #888; }
+        pre code { color: #d2a8ff; font-family: monospace; font-size: 13px; line-height: 1.6; display: block; padding: 15px; overflow-x: auto; }
+        .loading { font-size: 12px; color: #555; font-style: italic; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <header class="p-4 px-6 border-b border-[#282a2d] flex justify-between items-center bg-[#0b0b0c]">
+        <div class="flex items-center gap-3">
+            <div class="gemini-logo"></div>
+            <span class="font-bold text-lg">RAJ MODS <span class="text-xs font-normal text-blue-500">ENGINE v4.0</span></span>
+        </div>
+        <div id="status" class="text-[10px] text-green-500 font-bold uppercase tracking-widest animate-pulse">● System Online</div>
+    </header>
+
+    <main id="chatBox" class="flex-1 overflow-y-auto p-5 md:p-10 space-y-8 pb-40">
+        <div id="messageContainer" class="max-w-4xl mx-auto flex flex-col gap-8">
+            <div class="flex gap-4 items-start opacity-80">
+                <div style="width: 32px; height: 32px; background: #222; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><div class="gemini-logo" style="background: white; width: 14px; height: 14px;"></div></div>
+                <div class="text-[14px] pt-1">**RAJ**, engine updated. Ab ye model auto-detect karega. Prompt do!</div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="p-6 fixed bottom-0 w-full bg-[#0b0b0c] flex justify-center z-30 shadow-2xl">
+        <div class="w-full max-w-4xl relative">
+            <textarea id="userInput" rows="1" placeholder="Type logic or code request..." class="w-full bg-[#161617] border border-[#282a2d] rounded-[24px] pl-6 pr-16 py-5 focus:outline-none focus:border-blue-500/50 transition-all text-[#e3e3e3] min-h-[64px]"></textarea>
+            <button id="sendBtn" class="absolute right-5 top-[18px] text-blue-500 hover:text-white transition-all transform active:scale-90">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+            </button>
+        </div>
+    </footer>
+
+    <script>
+        /* --- APNI KEYS YAHAN DAALEIN --- */
+        const apiKeys = [
+            "AIzaSyCy5lKixcNcCH6NeAiehvF_xZb0D-vyuwo",
+            "AIzaSyCFTAoY-suaxOtE9fEnB4opVfMxQKT_dy4"
+        ];
+        
+        let currentKey = 0;
+        const msgContainer = document.getElementById('messageContainer');
+        const userInput = document.getElementById('userInput');
+
+        async function copyCode(btn, id) {
+            await navigator.clipboard.writeText(document.getElementById(id).innerText);
+            btn.innerText = 'Copied';
+            setTimeout(() => btn.innerText = 'Copy', 2000);
+        }
+
+        async function sendMessage() {
+            const val = userInput.value.trim();
+            if (!val) return;
+
+            // User Message
+            const userDiv = document.createElement('div');
+            userDiv.className = "self-end bg-[#21262d] p-4 px-6 rounded-[22px] rounded-tr-sm max-w-[85%] text-[15px] border border-[#30363d]";
+            userDiv.innerText = val;
+            msgContainer.appendChild(userDiv);
+            userInput.value = '';
+            userInput.style.height = '64px';
+
+            // Bot Placeholder
+            const botWrapper = document.createElement('div');
+            botWrapper.className = "flex gap-4 items-start w-full";
+            botWrapper.innerHTML = `<div style="width: 32px; height: 32px; background: #222; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><div class="gemini-logo" style="width: 14px; height: 14px;"></div></div>`;
+            const botDiv = document.createElement('div');
+            botDiv.className = "flex-1 text-[15px] text-[#e3e3e3] pt-1";
+            botDiv.innerHTML = `<span class="loading animate-pulse text-blue-400">Searching Model & Key...</span>`;
+            botWrapper.appendChild(botDiv);
+            msgContainer.appendChild(botWrapper);
+            
+            document.getElementById('chatBox').scrollTo(0, document.getElementById('chatBox').scrollHeight);
+
+            let success = false;
+            let lastErrorMsg = "";
+
+            // Try Models List
+            const modelVariations = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-pro"];
+
+            for (let k = 0; k < apiKeys.length; k++) {
+                const key = apiKeys[currentKey].trim();
+                
+                for (let modelName of modelVariations) {
+                    try {
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ contents: [{ parts: [{ text: val }] }] })
+                        });
+
+                        const data = await response.json();
+
+                        if (data.candidates && data.candidates[0].content) {
+                            const rawText = data.candidates[0].content.parts[0].text;
+                            botDiv.innerHTML = rawText.replace(/```([\s\S]*?)```/g, (m, code) => {
+                                const id = 'c' + Math.random().toString(36).substr(2, 5);
+                                return `<div class="code-block"><div class="code-header"><span>Module</span><button onclick="copyCode(this, '${id}')">Copy</button></div><pre id="${id}"><code>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre></div>`;
+                            });
+                            success = true;
+                            break;
+                        } else if (data.error) {
+                            lastErrorMsg = data.error.message;
+                        }
+                    } catch (e) {
+                        lastErrorMsg = e.message;
+                    }
+                }
+                if (success) break;
+                currentKey = (currentKey + 1) % apiKeys.length;
+            }
+
+            if (!success) {
+                botDiv.innerHTML = `<div class="p-3 border border-red-500/20 bg-red-500/5 rounded-xl text-red-500 text-xs"><b>SYSTEM ERROR:</b><br>${lastErrorMsg}<br><br>Tip: Keys refresh karein.</div>`;
+            }
+            document.getElementById('chatBox').scrollTo(0, document.getElementById('chatBox').scrollHeight);
+        }
+
+        document.getElementById('sendBtn').onclick = sendMessage;
+        userInput.onkeydown = (e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
+        userInput.oninput = function() { this.style.height = '64px'; this.style.height = this.scrollHeight + 'px'; };
+    </script>
+</body>
+</html>
